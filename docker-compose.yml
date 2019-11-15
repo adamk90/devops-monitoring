@@ -1,0 +1,62 @@
+version: "3"
+services:
+  sql-service:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=devops
+      - MYSQL_DATABASE=golf
+    volumes:
+      - ./database:/docker-entrypoint-initdb.d
+  webapp:
+    image: gradle
+    command: ["gradle", "bootRun"]
+    volumes:
+      - "./:/home/gradle/project"
+    user: gradle
+    working_dir: /home/gradle/project
+    environment:
+      - DBHOST=sql-service
+    ports:
+      - "8088:8088"
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+  node-exporter:
+    image: prom/node-exporter:v0.18.1
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - 9100:9100
+  docker-exporter:
+    ports:
+      -  9104:9104 
+    volumes:
+      - /sys/fs/cgroup:/cgroup 
+      - /var/run/docker.sock:/var/run/docker.sock 
+    image: prom/container-exporter
+  cadvisor:
+    image: google/cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+    ports:
+      - 9106:8080
+
